@@ -1,25 +1,67 @@
 "use client";
 
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from 'next/navigation'; // Import useRouter
 
 type Props = {
   params: { id: string };
 };
 
+type Blog = {
+  post?: {
+    title?: string;
+    author?: {
+      name?: string;
+    };
+    photo?: string;
+    content?: string;
+  };
+  commentCount?: number;
+  comments?: Array<{
+    _id: string;
+    author?: {
+      name?: string;
+    };
+    content?: string;
+  }>;
+};
+
 export default function SingleBlog({ params }: Props) {
-  const { isLoading, data: blog } = useQuery({
+  const queryClient = useQueryClient();
+  const router = useRouter(); // Initialize useRouter
+  const { isLoading, data: blog } = useQuery<Blog>({
     queryKey: ["blog", params.id],
     queryFn: async () => {
-      const res = await axios.get(
-        "http://localhost:5000/api/blogs/" + params.id
-      );
+      const res = await axios.get(`http://localhost:5000/api/blogs/${params.id}`);
       return res.data;
     },
   });
+
+  const deletePostMutation = useMutation({
+    mutationFn: async () => {
+      await axios.delete(`http://localhost:5000/api/blogs/${params.id}`);
+    },
+    onSuccess: () => {
+      router.push('/'); // Redirect to home or another page after deletion
+    },
+    onError: (err) => {
+      console.error('Error deleting post:', err);
+    },
+  });
+
+  const handleEdit = () => {
+    router.push(`/edit/${params.id}`); // Redirect to an edit page
+  };
+
+  const handleDelete = () => {
+    if (confirm('Are you sure you want to delete this post?')) {
+      deletePostMutation.mutate();
+    }
+  };
 
   if (isLoading) return "loading...";
 
@@ -27,25 +69,39 @@ export default function SingleBlog({ params }: Props) {
     <div className="px-4 sm:px-0 sm:container sm:mx-auto">
       <div className="text-center my-24 max-w-[750px] mx-auto">
         <h1 className="text-2xl sm:text-5xl tracking-tight font-bold">
-          {blog.post?.title}
+          {blog?.post?.title}
         </h1>
         <Link
           href={"/"}
           className="relative mx-auto mt-6 w-16 flex items-center justify-center bg-gray-200 text-sm font-bold h-16 rounded-full"
         >
-          {blog.post?.author?.name?.substring(0, 1)}
+          {blog?.post?.author?.name?.substring(0, 1)}
         </Link>
         <p className="mt-1 pb-2 text-lg max-w-[750px] mx-auto font-bold">
-          {blog.post?.author?.name}
+          {blog?.post?.author?.name}
         </p>
+        <div className="mt-4">
+          <button
+            onClick={handleEdit}
+            className="bg-blue-500 text-white px-4 py-2 rounded-md mr-2"
+          >
+            Edit Blog
+          </button>
+          <button
+            onClick={handleDelete}
+            className="bg-red-500 text-white px-4 py-2 rounded-md"
+          >
+            Delete Blog
+          </button>
+        </div>
       </div>
       <div className="mx-auto mb-10 max-w-[800px] -mt-[56px]">
         <picture className="block relative">
           <div className="w-full pb-[56.25%]" />
-          <Image src={blog.post?.photo} alt="" fill className="object-cover" />
+          <Image src={blog?.post?.photo || ""} alt="" fill className="object-cover" />
         </picture>
         <div className="mt-4">
-          <p>{blog.post?.content}</p>
+          <p>{blog?.post?.content}</p>
         </div>
       </div>
       <div className="max-w-[800px] mx-auto pb-10">
@@ -55,17 +111,16 @@ export default function SingleBlog({ params }: Props) {
         </h3>
         <CreateCommentForm postId={params.id} />
         <div className="mt-3">
-          {blog.commentCount > 0
-            ? blog.comments?.map((comment: any) => (
+          {blog?.commentCount && blog.commentCount > 0
+            ? blog.comments?.map((comment) => (
                 <div key={comment._id} className="flex items-start mb-4">
                   <div className="w-10 h-10 bg-gray-200 rounded-full flex text-sm font-bold items-center justify-center relative mr-4 flex-shrink-0 select-none">
-                    {comment.author?.name.substring(0, 1)}
+                    {comment.author?.name?.substring(0, 1)}
                   </div>
                   <div className="flex-grow flex-shrink">
                     <h3 className="text-sm font-semibold my-auto">
                       {comment.author?.name}
                     </h3>
-
                     <p className="pt-[2px] text-sm text-gray-700">
                       {comment.content}
                     </p>
@@ -79,16 +134,51 @@ export default function SingleBlog({ params }: Props) {
   );
 }
 
+type CreateCommentData = {
+  text: string;
+};
+
 function CreateCommentForm({ postId }: { postId: string }) {
-  const [text, setText] = useState("");
+  const [text, setText] = useState<string>("");
+  const queryClient = useQueryClient();
 
   const { isPending, mutate: handleCreateComment } = useMutation({
-    mutationFn: async () => {
-      const res = await axios.post("http://localhost:5000/api/comments", {
-        text,
-        postId,
-      }, { withCredentials: true });
+    mutationFn: async (newComment: CreateCommentData) => {
+      const res = await axios.post(
+        "http://localhost:5000/api/comments",
+        {
+          ...newComment,
+          postId,
+        },
+        { withCredentials: true }
+      );
       return res.data;
+    },
+    onMutate: async (newComment: CreateCommentData) => {
+      // Optimistically update the cache with the new comment
+      await queryClient.cancelQueries({ queryKey: ["blog", postId] });
+      const previousBlogData = queryClient.getQueryData<Blog>(["blog", postId]);
+
+      queryClient.setQueryData<Blog>(["blog", postId], (oldData) => ({
+        ...oldData,
+        commentCount: (oldData?.commentCount ?? 0) + 1,
+        comments: [
+          ...(oldData?.comments ?? []),
+          {
+            _id: new Date().getTime().toString(),
+            author: { name: "You" },
+            content: newComment.text,
+          }, // Dummy comment data
+        ],
+      }));
+
+      return { previousBlogData };
+    },
+    onError: (err, newComment, context) => {
+      queryClient.setQueryData(["blog", postId], context?.previousBlogData);
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ["blog", postId] });
     },
   });
 
@@ -109,7 +199,8 @@ function CreateCommentForm({ postId }: { postId: string }) {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            handleCreateComment();
+            handleCreateComment({ text });
+            setText("");
           }}
         >
           <textarea

@@ -47,7 +47,7 @@ export default function Home() {
       </div>
       <div className="w-full px-4 sm:px-0 sm:w-auto sm:container sm:mx-auto mb-10">
         <div className="grid grid-flow-row grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 sm:gap-4">
-          {blogs.map((blog:any) => (
+          {blogs?.map((blog:any) => (
             <Card key={blog._id} {...blog} />
           ))}
         </div>

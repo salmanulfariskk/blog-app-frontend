@@ -3,11 +3,13 @@
 import { useMutation } from "@tanstack/react-query";
 import axios from "axios";
 import Image from "next/image";
-import { redirect } from "next/navigation";
-import { useRouter } from "next/router";
+import { useRouter } from "next/navigation"; // Updated import
 import { useState } from "react";
+import { ToastContainer, toast } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function New() {
+  const router = useRouter(); // This now works with the app directory
   const [values, setValues] = useState<{
     title: string;
     content: string;
@@ -38,7 +40,7 @@ export default function New() {
     const file = e.target.files?.[0];
 
     if (!file) {
-      throw new Error("upload a file");
+      throw new Error("Please upload a file");
     }
 
     setValues((prev) => ({
@@ -57,23 +59,49 @@ export default function New() {
       for (const key in values) {
         if (key === "image") {
           if (values.image.file) {
-            formData.append('file', values.image.file);
+            formData.append("file", values.image.file);
             continue;
           }
+        } else {
+          formData.append(key, values[key as keyof typeof values] as string);
         }
-        formData.append(key, values[key]);
       }
 
-      const res = await axios.post("http://localhost:5000/api/blogs", formData, { withCredentials: true });
+      await axios.post("http://localhost:5000/api/blogs", formData, {
+        withCredentials: true,
+      });
     },
     onSuccess: () => {
-      redirect('/')
-    }
+      toast.success("Post created successfully!", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+      });
+
+      setTimeout(() => {
+        router.push("/"); // This now works correctly
+      }, 3000);
+    },
+    onError: (error) => {
+      toast.error("Failed to create post. Please try again.", {
+        position: "top-right",
+        autoClose: 3000,
+        hideProgressBar: false,
+        closeOnClick: true,
+        pauseOnHover: true,
+        draggable: true,
+        progress: undefined,
+      });
+    },
   });
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    createPost()
+    createPost();
   };
 
   return (
@@ -128,6 +156,7 @@ export default function New() {
             </button>
           </div>
         </form>
+        <ToastContainer />
       </div>
     </div>
   );

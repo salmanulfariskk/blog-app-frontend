@@ -3,8 +3,10 @@
 import { useSession } from "@/context/SessionContext";
 import axios from "axios";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { toast, ToastContainer } from "react-toastify";
+import "react-toastify/dist/ReactToastify.css";
 
 export default function Login() {
   const { setSession } = useSession();
@@ -12,6 +14,7 @@ export default function Login() {
     email: "",
     password: "",
   });
+  const router = useRouter();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setValues((prevValues) => ({
@@ -29,14 +32,20 @@ export default function Login() {
         values,
         { withCredentials: true }
       );
-      localStorage.setItem('user', JSON.stringify(res.data.userData))
+      localStorage.setItem("user", JSON.stringify(res.data.userData));
       setSession(res.data.userData);
-      redirect("/");
-    } catch (error) {}
+      toast.success("Login successful!");
+      setTimeout(() => {
+        router.push("/");
+      }, 2000); // Wait for 2 seconds before redirecting to show the toast
+    } catch (error) {
+      toast.error("Login failed. Please check your credentials.");
+    }
   };
 
   return (
     <div>
+      <ToastContainer />
       <h1 className="text-lg font-bold mb-6 text-center">Sign in</h1>
       <form onSubmit={handleSubmit}>
         <div className="mb-4">
