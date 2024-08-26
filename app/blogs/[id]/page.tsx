@@ -5,7 +5,7 @@ import axios from "axios";
 import Image from "next/image";
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter } from 'next/navigation'; // Import useRouter
+import { useRouter } from "next/navigation"; // Import useRouter
 
 type Props = {
   params: { id: string };
@@ -16,6 +16,7 @@ type Blog = {
     title?: string;
     author?: {
       name?: string;
+      email?: string;
     };
     photo?: string;
     content?: string;
@@ -36,32 +37,41 @@ export default function SingleBlog({ params }: Props) {
   const { isLoading, data: blog } = useQuery<Blog>({
     queryKey: ["blog", params.id],
     queryFn: async () => {
-      const res = await axios.get(`http://localhost:5000/api/blogs/${params.id}`);
+      const res = await axios.get(
+        `http://localhost:5000/api/blogs/${params.id}`
+      );
       return res.data;
     },
   });
 
   const deletePostMutation = useMutation({
     mutationFn: async () => {
-      await axios.delete(`http://localhost:5000/api/blogs/${params.id}`);
+      await axios.delete(`http://localhost:5000/api/blogs/${params.id}`, {
+        withCredentials: true,
+      });
     },
     onSuccess: () => {
-      router.push('/'); // Redirect to home or another page after deletion
+      router.push("/"); // Redirect to home or another page after deletion
     },
     onError: (err) => {
-      console.error('Error deleting post:', err);
+      console.error("Error deleting post:", err);
     },
   });
 
   const handleEdit = () => {
-    router.push(`/edit/${params.id}`); // Redirect to an edit page
+    router.push(`/editblog/${params.id}`); // Redirect to the edit page
   };
 
   const handleDelete = () => {
-    if (confirm('Are you sure you want to delete this post?')) {
+    if (confirm("Are you sure you want to delete this post?")) {
       deletePostMutation.mutate();
     }
   };
+
+  if (isLoading) return "loading...";
+
+  const userEmail = JSON.parse(localStorage.getItem("user") || "{}").email;
+  const blogEmail = blog?.post?.author?.email;
 
   if (isLoading) return "loading...";
 
@@ -80,25 +90,32 @@ export default function SingleBlog({ params }: Props) {
         <p className="mt-1 pb-2 text-lg max-w-[750px] mx-auto font-bold">
           {blog?.post?.author?.name}
         </p>
-        <div className="mt-4">
-          <button
-            onClick={handleEdit}
-            className="bg-blue-500 text-white px-4 py-2 rounded-md mr-2"
-          >
-            Edit Blog
-          </button>
-          <button
-            onClick={handleDelete}
-            className="bg-red-500 text-white px-4 py-2 rounded-md"
-          >
-            Delete Blog
-          </button>
-        </div>
+        {blogEmail === userEmail && (
+          <div className="mt-4">
+            <button
+              onClick={handleEdit}
+              className="bg-blue-500 text-white px-4 py-2 rounded-md mr-2"
+            >
+              Edit Blog
+            </button>
+            <button
+              onClick={handleDelete}
+              className="bg-red-500 text-white px-4 py-2 rounded-md"
+            >
+              Delete Blog
+            </button>
+          </div>
+        )}
       </div>
       <div className="mx-auto mb-10 max-w-[800px] -mt-[56px]">
         <picture className="block relative">
           <div className="w-full pb-[56.25%]" />
-          <Image src={blog?.post?.photo || ""} alt="" fill className="object-cover" />
+          <Image
+            src={blog?.post?.photo || ""}
+            alt=""
+            fill
+            className="object-cover"
+          />
         </picture>
         <div className="mt-4">
           <p>{blog?.post?.content}</p>

@@ -20,7 +20,8 @@ export default function Signup() {
   });
   const [error, setError] = useState<string | null>(null);
   const router = useRouter();
-
+  
+  
   const handleChange = (e: ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };

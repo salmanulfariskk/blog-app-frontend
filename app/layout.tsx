@@ -6,6 +6,7 @@ import Footer from "@/components/Footer";
 import ReactQueryClientProvider from "@/components/QueryClientProvider";
 import SessionProvider from "@/context/SessionContext";
 
+
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
